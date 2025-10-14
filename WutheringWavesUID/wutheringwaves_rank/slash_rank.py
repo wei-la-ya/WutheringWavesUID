@@ -343,8 +343,18 @@ async def get_avatar(
         else:
             url = getattr(sender, "avatar", None)
         if isinstance(url, str) and (url.startswith("http://") or url.startswith("https://")):
-            with urllib.request.urlopen(url, timeout=8) as resp:
-                data = resp.read()
+            # 使用 TimedCache 缓存平台头像字节（受 QQPicCache 开关控制）
+            cache_on = WutheringWavesConfig.get_config("QQPicCache").data
+            if cache_on:
+                cache_key = f"avatar_url:{url}"
+                data = pic_cache.get(cache_key)
+                if not data:
+                    with urllib.request.urlopen(url, timeout=8) as resp:
+                        data = resp.read()
+                    pic_cache.set(cache_key, data)
+            else:
+                with urllib.request.urlopen(url, timeout=8) as resp:
+                    data = resp.read()
             raw = Image.open(io.BytesIO(data)).convert("RGBA")
             base = Image.new("RGBA", (180, 180))
             avatar_sq = crop_center_img(raw, 120, 120)
